@@ -31,9 +31,8 @@ if uploaded_file is not None:
         st.stop()
 
     
-df['Datetime'] = pd.to_datetime(df['DateTime'], errors='coerce')
-df = df.dropna(subset=['Datetime'])
-
+    df['Datetime'] = pd.to_datetime(df['DateTime'], errors='coerce')
+    df = df.dropna(subset=['Datetime'])
     df = df[df['Country'] == 'India'].sort_values(by='Datetime')
 
     model_list = [
