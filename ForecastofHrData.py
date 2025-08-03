@@ -9,6 +9,7 @@ import xgboost as xgb
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 
+
 # Title and disclaimer
 st.title("Power Demand Forecasting and Analysis")
 st.markdown("*(Data Copyright © 2025, NITI Aayog)*")
