@@ -9,17 +9,6 @@ import xgboost as xgb
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 import matplotlib.pyplot as plt
 
-# Set custom background using HTML and CSS
-page_bg_img = """
-<style>
-body {
-background-image: url("https://images.unsplash.com/photo-1504384308090-c894fdcc538d");
-background-size: cover;
-}
-</style>
-"""
-st.markdown(page_bg_img, unsafe_allow_html=True)
-
 # Title and disclaimer
 st.title("Power Demand Forecasting and Analysis")
 st.markdown("*(Data Copyright © 2025, NITI Aayog)*")
@@ -80,20 +69,6 @@ def calculate_financials(test, predictions):
     yearly_savings_inr = total_savings_mw * 4000
     return daily_savings_inr, yearly_savings_inr
 
-def find_best_model(data):
-    best_model = None
-    best_percent = 0
-    best_savings = -np.inf
-    for model in ["Linear Regression", "Random Forest", "SVR", "XGBoost", "SARIMAX"]:
-        for percent in range(10, 100, 10):
-            train, test, predictions = train_and_predict(data, percent, model)
-            _, yearly_savings_inr = calculate_financials(test, predictions)
-            if yearly_savings_inr > best_savings:
-                best_savings = yearly_savings_inr
-                best_model = model
-                best_percent = percent
-    return best_model, best_percent
-
 if uploaded_file:
     df = pd.read_excel(uploaded_file, sheet_name="Yearly Demand Profile", engine="openpyxl")
     df['DateTime'] = pd.to_datetime(df['DateTime'] + ' ' + df['Year'].astype(str), format='%d-%b %I%p %Y')
@@ -135,7 +110,7 @@ if uploaded_file:
     # Visualization
     st.subheader(f"Prediction vs Actuals vs Baseline ({model_choice})")
     baseline = np.mean(train)
-    fig, ax = plt.subplots(figsize=(14, 7))
+    fig, ax = plt.subplots(figsize=(16, 8))
     ax.plot(df['DateTime'][len(train):], test, label='Actual')
     ax.plot(df['DateTime'][len(train):], predictions, label='Predicted')
     ax.axhline(y=baseline, color='gray', linestyle='--', label='Baseline Mean')
@@ -160,7 +135,3 @@ if uploaded_file:
             st.markdown(f"<span style='color:red'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
             st.markdown(f"<span style='color:red'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
         st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
-
-        if st.button("Optimize and Simulate"):
-            best_model, best_percent = find_best_model(data)
-            st.success(f"Optimized Model: {best_model}, Training Percentage: {best_percent}%")
