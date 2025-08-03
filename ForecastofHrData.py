@@ -20,7 +20,25 @@ uploaded_file = st.file_uploader("📤 Upload Hourly Power Demand Excel File", t
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
-    df['Datetime'] = pd.to_datetime(df['Datetime'])
+
+    # Show column names for debugging
+    st.write("Uploaded file columns:", df.columns.tolist())
+
+    # Handle datetime column
+    if 'Datetime' not in df.columns:
+        if 'Date' in df.columns and 'Time' in df.columns:
+            df['Datetime'] = pd.to_datetime(df['Date'].astype(str) + ' ' + df['Time'].astype(str))
+        else:
+            st.error("❌ The file must contain either a 'Datetime' column or both 'Date' and 'Time' columns.")
+            st.stop()
+    else:
+        df['Datetime'] = pd.to_datetime(df['Datetime'])
+
+    # Validate required columns
+    if 'Country' not in df.columns or 'Power Demand (MW)' not in df.columns:
+        st.error("❌ Required columns missing: 'Country' and 'Power Demand (MW)' must be present.")
+        st.stop()
+
     df = df[df['Country'] == 'India'].sort_values(by='Datetime')
 
     model_list = [
