@@ -22,7 +22,7 @@ st.markdown(page_bg_img, unsafe_allow_html=True)
 
 # Title and disclaimer
 st.title("Power Demand Forecasting and Analysis")
-st.markdown("**Copyright © 2025, NITI Aayog**")
+st.markdown("*(Data Copyright © 2025, NITI Aayog)*")
 st.markdown("This tool helps forecast power demand using various statistical models and provides financial implications based on predictions.")
 
 # Sidebar inputs
@@ -102,10 +102,6 @@ if uploaded_file:
 
     data = df['Power Demand (MW)'].values
 
-    if st.button("Optimize and Simulate"):
-        model_choice, train_percent = find_best_model(data)
-        st.success(f"Optimized Model: {model_choice}, Training Percentage: {train_percent}%")
-
     train, test, predictions = train_and_predict(data, train_percent, model_choice)
     r2, mae, rmse, mape, mse, evs = calculate_metrics(test, predictions)
     daily_savings_inr, yearly_savings_inr = calculate_financials(test, predictions)
@@ -119,10 +115,27 @@ if uploaded_file:
     st.sidebar.write(f"MSE: {mse:.2f}")
     st.sidebar.write(f"Explained Variance Score: {evs:.2f}")
 
+    st.sidebar.subheader("Model Insights")
+    insights = []
+    if r2 > 0.8:
+        insights.append("✅ High predictive accuracy.")
+    elif r2 > 0.5:
+        insights.append("⚠️ Moderate accuracy. May need tuning.")
+    else:
+        insights.append("❌ Low accuracy. Consider alternative models.")
+    if mae < 10000:
+        insights.append("✅ Low average error.")
+    else:
+        insights.append("⚠️ High average error.")
+    if mape < 0.1:
+        insights.append("✅ Good percentage error performance.")
+    for insight in insights:
+        st.sidebar.markdown(f"- {insight}")
+
     # Visualization
     st.subheader(f"Prediction vs Actuals vs Baseline ({model_choice})")
     baseline = np.mean(train)
-    fig, ax = plt.subplots(figsize=(12,6))
+    fig, ax = plt.subplots(figsize=(14, 7))
     ax.plot(df['DateTime'][len(train):], test, label='Actual')
     ax.plot(df['DateTime'][len(train):], predictions, label='Predicted')
     ax.axhline(y=baseline, color='gray', linestyle='--', label='Baseline Mean')
@@ -147,3 +160,7 @@ if uploaded_file:
             st.markdown(f"<span style='color:red'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
             st.markdown(f"<span style='color:red'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
         st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
+
+        if st.button("Optimize and Simulate"):
+            best_model, best_percent = find_best_model(data)
+            st.success(f"Optimized Model: {best_model}, Training Percentage: {best_percent}%")
