@@ -132,7 +132,9 @@ if uploaded_file is not None:
         return forecast, test
 
     scaler = MinMaxScaler()
-    scaled_series = scaler.fit_transform(series.reshape(-1, 1)).flatten()
+    series = pd.to_numeric(df['Power Demand (MW)'], errors='coerce')
+    series = series.replace([np.inf, -np.inf], np.nan).dropna()
+    scaled_series = scaler.fit_transform(series.values.reshape(-1, 1)).flatten()
     window = 24
     X_train, y_train = create_features(scaled_series[:int(0.7*len(series))], window)
     X_test, y_test = create_features(scaled_series[int(0.7*len(series))-window:], window)
