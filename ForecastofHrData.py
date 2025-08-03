@@ -20,24 +20,21 @@ uploaded_file = st.file_uploader("📤 Upload Hourly Power Demand Excel File", t
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
-
-    # Show column names for debugging
     st.write("Uploaded file columns:", df.columns.tolist())
 
-    # Validate required columns
     required_cols = ['Country', 'Year', 'DateTime', 'Power Demand (MW)']
     if not all(col in df.columns for col in required_cols):
         st.error(f"❌ Required columns missing. Expected columns: {required_cols}")
         st.stop()
 
-    
+    # Safe datetime conversion
     df['Datetime'] = pd.to_datetime(df['DateTime'], errors='coerce')
-    df = df.dropna(subset=['Datetime'])
+    df['Power Demand (MW)'] = pd.to_numeric(df['Power Demand (MW)'], errors='coerce')
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=['Datetime', 'Power Demand (MW)'])
+
     df = df[df['Country'] == 'India'].sort_values(by='Datetime')
 
-    model_list = [
-        "SARIMAX", "RandomForest", "LinearRegression", "SVR", "XGBoost", "LSTM", "GRU", "Hybrid"
-    ]
+    model_list = ["SARIMAX", "RandomForest", "LinearRegression", "SVR", "XGBoost", "LSTM", "GRU", "Hybrid"]
 
     if "model_selector" not in st.session_state:
         st.session_state.model_selector = model_list[0]
@@ -132,9 +129,7 @@ if uploaded_file is not None:
         return forecast, test
 
     scaler = MinMaxScaler()
-    series = pd.to_numeric(df['Power Demand (MW)'], errors='coerce')
-    series = series.replace([np.inf, -np.inf], np.nan).dropna()
-    scaled_series = scaler.fit_transform(series.values.reshape(-1, 1)).flatten()
+    scaled_series = scaler.fit_transform(series.reshape(-1, 1)).flatten()
     window = 24
     X_train, y_train = create_features(scaled_series[:int(0.7*len(series))], window)
     X_test, y_test = create_features(scaled_series[int(0.7*len(series))-window:], window)
