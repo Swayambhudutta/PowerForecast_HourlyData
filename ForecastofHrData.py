@@ -24,21 +24,13 @@ if uploaded_file is not None:
     # Show column names for debugging
     st.write("Uploaded file columns:", df.columns.tolist())
 
-    # Handle datetime column
-    if 'Datetime' not in df.columns:
-        if 'Date' in df.columns and 'Time' in df.columns:
-            df['Datetime'] = pd.to_datetime(df['Date'].astype(str) + ' ' + df['Time'].astype(str))
-        else:
-            st.error("❌ The file must contain either a 'Datetime' column or both 'Date' and 'Time' columns.")
-            st.stop()
-    else:
-        df['Datetime'] = pd.to_datetime(df['Datetime'])
-
     # Validate required columns
-    if 'Country' not in df.columns or 'Power Demand (MW)' not in df.columns:
-        st.error("❌ Required columns missing: 'Country' and 'Power Demand (MW)' must be present.")
+    required_cols = ['Country', 'Year', 'DateTime', 'Power Demand (MW)']
+    if not all(col in df.columns for col in required_cols):
+        st.error(f"❌ Required columns missing. Expected columns: {required_cols}")
         st.stop()
 
+    df['Datetime'] = pd.to_datetime(df['DateTime'])
     df = df[df['Country'] == 'India'].sort_values(by='Datetime')
 
     model_list = [
