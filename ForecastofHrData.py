@@ -179,4 +179,5 @@ if uploaded_file:
             st.subheader("Financial Implications")
             yearly_savings_crore = yearly_savings_inr / 1e7
             if yearly_savings_inr >= 0:
-                st.markdown(f"<span style='color:green'>Average Daily Savings: ₹{daily_s
+                st.markdown(f"<span style='color:green'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
+
