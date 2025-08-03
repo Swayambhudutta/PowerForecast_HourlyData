@@ -69,17 +69,6 @@ def calculate_financials(test, predictions):
     yearly_savings_inr = total_savings_mw * 4000
     return daily_savings_inr, yearly_savings_inr
 
-def find_optimal_training(data, model_choice):
-    best_savings = -np.inf
-    best_percent = 0
-    for percent in range(10, 100, 10):
-        _, test, predictions = train_and_predict(data, percent, model_choice)
-        _, yearly_savings_inr = calculate_financials(test, predictions)
-        if yearly_savings_inr > best_savings:
-            best_savings = yearly_savings_inr
-            best_percent = percent
-    return best_percent, best_savings
-
 if uploaded_file:
     df = pd.read_excel(uploaded_file, sheet_name="Yearly Demand Profile", engine="openpyxl")
     df['DateTime'] = pd.to_datetime(df['DateTime'] + ' ' + df['Year'].astype(str), format='%d-%b %I%p %Y')
@@ -88,14 +77,18 @@ if uploaded_file:
 
     data = df['Power Demand (MW)'].values
 
-    if st.sidebar.button("Find Optimal Training Percentage"):
-        optimal_percent, optimal_savings = find_optimal_training(data, model_choice)
-        st.sidebar.markdown(f"**Optimal Training %:** {optimal_percent}%")
-        st.sidebar.markdown(f"**Max Yearly Savings:** ₹{optimal_savings:,.2f}")
-
     train, test, predictions = train_and_predict(data, train_percent, model_choice)
     r2, mae, rmse, mape, mse, evs = calculate_metrics(test, predictions)
     daily_savings_inr, yearly_savings_inr = calculate_financials(test, predictions)
+
+    # Sidebar metrics
+    st.sidebar.subheader("Statistical Highlights")
+    st.sidebar.write(f"R² Score: {r2:.4f}")
+    st.sidebar.write(f"MAE: {mae:.2f}")
+    st.sidebar.write(f"RMSE: {rmse:.2f}")
+    st.sidebar.write(f"MAPE: {mape:.2f}")
+    st.sidebar.write(f"MSE: {mse:.2f}")
+    st.sidebar.write(f"Explained Variance Score: {evs:.2f}")
 
     # Visualization
     st.subheader("Prediction vs Actuals vs Baseline")
@@ -107,16 +100,14 @@ if uploaded_file:
     ax.set_xlabel("DateTime")
     ax.set_ylabel("Power Demand (MW)")
     ax.legend()
-    st.pyplot(fig)
-
-    train_count = len(train)
-    test_count = len(test)
-    train_pct = train_count * 100 / (train_count + test_count)
-    test_pct = 100 - train_pct
-    st.markdown(f"**Training Data:** {train_pct:.2f}% ({train_count} points), **Predicted Data:** {test_pct:.2f}% ({test_count} points)")
-
-    # Right panel for financials and metrics
     col1, col2 = st.columns([2, 1])
+    with col1:
+        st.pyplot(fig)
+        train_count = len(train)
+        test_count = len(test)
+        train_pct = train_count * 100 / (train_count + test_count)
+        test_pct = 100 - train_pct
+        st.markdown(f"**Training Data:** {train_pct:.2f}% ({train_count} points), **Predicted Data:** {test_pct:.2f}% ({test_count} points)")
     with col2:
         st.subheader("Financial Implications")
         if yearly_savings_inr >= 0:
@@ -126,11 +117,3 @@ if uploaded_file:
             st.markdown(f"<span style='color:red'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
             st.markdown(f"<span style='color:red'>Estimated Yearly Savings: ₹{yearly_savings_inr:,.2f}</span>", unsafe_allow_html=True)
         st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
-
-        st.subheader("Additional Metrics")
-        st.write(f"R² Score: {r2:.4f}")
-        st.write(f"MAE: {mae:.2f}")
-        st.write(f"RMSE: {rmse:.2f}")
-        st.write(f"MAPE: {mape:.2f}")
-        st.write(f"MSE: {mse:.2f}")
-        st.write(f"Explained Variance Score: {evs:.2f}")
