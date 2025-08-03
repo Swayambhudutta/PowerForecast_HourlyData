@@ -70,68 +70,76 @@ def calculate_financials(test, predictions):
     return daily_savings_inr, yearly_savings_inr
 
 if uploaded_file:
-    df = pd.read_excel(uploaded_file, sheet_name="Yearly Demand Profile", engine="openpyxl")
-    df['DateTime'] = pd.to_datetime(df['DateTime'] + ' ' + df['Year'].astype(str), format='%d-%b %I%p %Y')
-    df.sort_values('DateTime', inplace=True)
-    df.reset_index(drop=True, inplace=True)
+    try:
+        df = pd.read_excel(uploaded_file, sheet_name="Yearly Demand Profile", engine="openpyxl")
+        if 'DateTime' in df.columns and 'Year' in df.columns and 'Power Demand (MW)' in df.columns:
+            df['DateTime'] = pd.to_datetime(df['DateTime'] + ' ' + df['Year'].astype(str), format='%d-%b %I%p %Y')
+            df.sort_values('DateTime', inplace=True)
+            df.reset_index(drop=True, inplace=True)
 
-    data = df['Power Demand (MW)'].values
+            data = df['Power Demand (MW)'].values
 
-    train, test, predictions = train_and_predict(data, train_percent, model_choice)
-    r2, mae, rmse, mape, mse, evs = calculate_metrics(test, predictions)
-    daily_savings_inr, yearly_savings_inr = calculate_financials(test, predictions)
+            train, test, predictions = train_and_predict(data, train_percent, model_choice)
+            r2, mae, rmse, mape, mse, evs = calculate_metrics(test, predictions)
+            daily_savings_inr, yearly_savings_inr = calculate_financials(test, predictions)
 
-    # Sidebar metrics
-    st.sidebar.subheader("Statistical Highlights")
-    st.sidebar.write(f"R² Score: {r2:.4f}")
-    st.sidebar.write(f"MAE: {mae:.2f}")
-    st.sidebar.write(f"RMSE: {rmse:.2f}")
-    st.sidebar.write(f"MAPE: {mape:.2f}")
-    st.sidebar.write(f"MSE: {mse:.2f}")
-    st.sidebar.write(f"Explained Variance Score: {evs:.2f}")
+            # Sidebar metrics
+            st.sidebar.subheader("Statistical Highlights")
+            st.sidebar.write(f"R² Score: {r2:.4f}")
+            st.sidebar.write(f"MAE: {mae:.2f}")
+            st.sidebar.write(f"RMSE: {rmse:.2f}")
+            st.sidebar.write(f"MAPE: {mape:.2f}")
+            st.sidebar.write(f"MSE: {mse:.2f}")
+            st.sidebar.write(f"Explained Variance Score: {evs:.2f}")
 
-    st.sidebar.subheader("Model Insights")
-    insights = []
-    if r2 > 0.8:
-        insights.append("✅ High predictive accuracy.")
-    elif r2 > 0.5:
-        insights.append("⚠️ Moderate accuracy. May need tuning.")
-    else:
-        insights.append("❌ Low accuracy. Consider alternative models.")
-    if mae < 10000:
-        insights.append("✅ Low average error.")
-    else:
-        insights.append("⚠️ High average error.")
-    if mape < 0.1:
-        insights.append("✅ Good percentage error performance.")
-    for insight in insights:
-        st.sidebar.markdown(f"- {insight}")
+            st.sidebar.subheader("Model Insights")
+            insights = []
+            if r2 > 0.8:
+                insights.append("✅ High predictive accuracy.")
+            elif r2 > 0.5:
+                insights.append("⚠️ Moderate accuracy. May need tuning.")
+            else:
+                insights.append("❌ Low accuracy. Consider alternative models.")
+            if mae < 10000:
+                insights.append("✅ Low average error.")
+            else:
+                insights.append("⚠️ High average error.")
+            if mape < 0.1:
+                insights.append("✅ Good percentage error performance.")
+            for insight in insights:
+                st.sidebar.markdown(f"- {insight}")
 
-    # Visualization
-    st.subheader(f"Prediction vs Actuals vs Baseline ({model_choice})")
-    baseline = np.mean(train)
-    fig, ax = plt.subplots(figsize=(16, 8))
-    ax.plot(df['DateTime'][len(train):], test, label='Actual')
-    ax.plot(df['DateTime'][len(train):], predictions, label='Predicted')
-    ax.axhline(y=baseline, color='gray', linestyle='--', label='Baseline Mean')
-    ax.set_xlabel("DateTime")
-    ax.set_ylabel("Power Demand (MW)")
-    ax.legend()
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.pyplot(fig)
-        train_count = len(train)
-        test_count = len(test)
-        train_pct = train_count * 100 / (train_count + test_count)
-        test_pct = 100 - train_pct
-        st.markdown(f"**Training Data:** {train_pct:.2f}% ({train_count} points), **Predicted Data:** {test_pct:.2f}% ({test_count} points)")
-    with col2:
-        st.subheader("Financial Implications")
-        yearly_savings_crore = yearly_savings_inr / 1e7
-        if yearly_savings_inr >= 0:
-            st.markdown(f"<span style='color:green'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
-            st.markdown(f"<span style='color:green'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
+            # Visualization
+            st.subheader(f"Prediction vs Actuals vs Baseline ({model_choice})")
+            baseline = np.mean(train)
+            fig, ax = plt.subplots(figsize=(18, 9))
+            ax.plot(df['DateTime'][len(train):], test, label='Actual')
+            ax.plot(df['DateTime'][len(train):], predictions, label='Predicted')
+            ax.axhline(y=baseline, color='gray', linestyle='--', label='Baseline Mean')
+            ax.set_xlabel("DateTime")
+            ax.set_ylabel("Power Demand (MW)")
+            ax.legend()
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.pyplot(fig)
+                train_count = len(train)
+                test_count = len(test)
+                train_pct = train_count * 100 / (train_count + test_count)
+                test_pct = 100 - train_pct
+                st.markdown(f"**Training Data:** {train_pct:.2f}% ({train_count} points), **Predicted Data:** {test_pct:.2f}% ({test_count} points)")
+            with col2:
+                st.subheader("Financial Implications")
+                yearly_savings_crore = yearly_savings_inr / 1e7
+                if yearly_savings_inr >= 0:
+                    st.markdown(f"<span style='color:green'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:green'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<span style='color:red'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='color:red'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
+                st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
         else:
-            st.markdown(f"<span style='color:red'>Average Daily Savings: ₹{daily_savings_inr:,.2f}</span>", unsafe_allow_html=True)
-            st.markdown(f"<span style='color:red'>Estimated Yearly Savings: ₹{yearly_savings_crore:,.2f} Crore</span>", unsafe_allow_html=True)
-        st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
+            st.error("Required columns ('DateTime', 'Year', 'Power Demand (MW)') not found in the uploaded Excel file.")
+    except Exception as e:
+        st.error(f"Error processing the uploaded file: {e}")
+else:
+    st.info("Please upload the 'Yearly Demand Profile.xlsx' file to proceed.")
