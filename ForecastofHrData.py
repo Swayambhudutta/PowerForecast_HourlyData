@@ -1,160 +1,110 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+import xgboost as xgb
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from xgboost import XGBRegressor
-import torch
-import torch.nn as nn
+import matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide")
-st.title("🔌 Hourly Power Demand Forecasting for India")
+# Title and disclaimer
+st.title("Power Demand Forecasting and Analysis")
+st.markdown("**Copyright © 2025, NITI Aayog**")
+st.markdown("This tool helps forecast power demand using various statistical models and provides financial implications based on predictions.")
 
-uploaded_file = st.file_uploader("📤 Upload Hourly Power Demand Excel File", type=["xlsx"])
+# Sidebar inputs
+st.sidebar.header("Model Configuration")
+model_choice = st.sidebar.selectbox("Choose Statistical Model", 
+                                    ["Linear Regression", "Random Forest", "SVR", "XGBoost", "SARIMAX"])
+train_percent = st.sidebar.slider("Training Data Percentage", 0, 100, 70)
 
-if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file, engine='openpyxl')
-    st.write("Uploaded file columns:", df.columns.tolist())
+# File uploader
+uploaded_file = st.file_uploader("Upload Power Demand Excel File", type=["xlsx"])
 
-    required_cols = ['Country', 'Year', 'DateTime', 'Power Demand (MW)']
-    if not all(col in df.columns for col in required_cols):
-        st.error(f"❌ Required columns missing. Expected columns: {required_cols}")
-        st.stop()
+if uploaded_file:
+    # Load data
+    df = pd.read_excel(uploaded_file, sheet_name="Yearly Demand Profile", engine="openpyxl")
+    df['DateTime'] = pd.to_datetime(df['DateTime'] + ' ' + df['Year'].astype(str), format='%d-%b %I%p %Y')
+    df.sort_values('DateTime', inplace=True)
+    df.reset_index(drop=True, inplace=True)
 
-    # Safe datetime conversion
-    df['Datetime'] = pd.to_datetime(df['DateTime'], errors='coerce')
-    df['Power Demand (MW)'] = pd.to_numeric(df['Power Demand (MW)'], errors='coerce')
-    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=['Datetime', 'Power Demand (MW)'])
+    # Prepare data
+    data = df['Power Demand (MW)'].values
+    n = len(data)
+    train_size = int(n * train_percent / 100)
+    train, test = data[:train_size], data[train_size:]
+    X_train = np.arange(train_size).reshape(-1, 1)
+    X_test = np.arange(train_size, n).reshape(-1, 1)
 
-    df = df[df['Country'] == 'India'].sort_values(by='Datetime')
+    # Model training and prediction
+    if model_choice == "Linear Regression":
+        model = LinearRegression()
+        model.fit(X_train, train)
+        predictions = model.predict(X_test)
+    elif model_choice == "Random Forest":
+        model = RandomForestRegressor()
+        model.fit(X_train, train)
+        predictions = model.predict(X_test)
+    elif model_choice == "SVR":
+        model = SVR()
+        model.fit(X_train, train)
+        predictions = model.predict(X_test)
+    elif model_choice == "XGBoost":
+        model = xgb.XGBRegressor()
+        model.fit(X_train, train)
+        predictions = model.predict(X_test)
+    elif model_choice == "SARIMAX":
+        model = SARIMAX(train, order=(1,1,1), seasonal_order=(1,1,1,24))
+        model_fit = model.fit(disp=False)
+        predictions = model_fit.forecast(steps=len(test))
 
-    model_list = ["SARIMAX", "RandomForest", "LinearRegression", "SVR", "XGBoost", "LSTM", "GRU", "Hybrid"]
+    # Metrics
+    r2 = r2_score(test, predictions)
+    mae = mean_absolute_error(test, predictions)
+    rmse = np.sqrt(mean_squared_error(test, predictions))
 
-    if "model_selector" not in st.session_state:
-        st.session_state.model_selector = model_list[0]
+    st.sidebar.subheader("Model Performance")
+    st.sidebar.write(f"R² Score: {r2:.4f}")
+    st.sidebar.write(f"MAE: {mae:.2f}")
+    st.sidebar.write(f"RMSE: {rmse:.2f}")
 
-    st.sidebar.header("⚙️ Model Configuration")
-    selected_model = st.sidebar.selectbox("Choose Forecasting Model", model_list, index=model_list.index(st.session_state.model_selector))
-    st.sidebar.subheader("📊 Accuracy Metrics")
+    # Insights
+    st.sidebar.subheader("Model Insights")
+    insights = []
+    if r2 > 0.8:
+        insights.append("High accuracy in predictions.")
+    elif r2 > 0.5:
+        insights.append("Moderate accuracy. Consider tuning parameters.")
+    else:
+        insights.append("Low accuracy. Model may not be suitable.")
+    if mae < 10000:
+        insights.append("Low average error in predictions.")
+    else:
+        insights.append("High average error. Consider alternative models.")
+    for insight in insights:
+        st.sidebar.markdown(f"- {insight}")
 
-    series = df['Power Demand (MW)'].values
-    dates = df['Datetime'].values
-    train, test = series[:int(0.7*len(series))], series[int(0.7*len(series)):]
+    # Financial implications
+    savings = np.maximum(0, test - predictions)
+    total_savings_mw = np.sum(savings)
+    daily_savings_inr = np.mean(savings) * 4000
+    yearly_savings_inr = total_savings_mw * 4000
 
-    def create_features(data, window=24):
-        X, y = [], []
-        for i in range(window, len(data)):
-            X.append(data[i-window:i])
-            y.append(data[i])
-        return np.array(X), np.array(y)
+    st.subheader("Financial Implications")
+    st.write(f"Average Daily Savings: ₹{daily_savings_inr:,.2f}")
+    st.write(f"Estimated Yearly Savings: ₹{yearly_savings_inr:,.2f}")
+    st.markdown("_Disclaimer: The average cost per MW considered is INR 4000._")
 
-    def train_model(model_name, X_train, y_train, X_test, scaler, train, test):
-        if model_name == "SARIMAX":
-            model = SARIMAX(train, order=(1, 1, 1), seasonal_order=(0, 0, 0, 0))
-            model_fit = model.fit(disp=False)
-            forecast = model_fit.forecast(steps=len(test))
-        elif model_name in ["RandomForest", "LinearRegression", "SVR", "XGBoost"]:
-            if model_name == "RandomForest":
-                model = RandomForestRegressor(n_estimators=100, random_state=42)
-            elif model_name == "LinearRegression":
-                model = LinearRegression()
-            elif model_name == "SVR":
-                model = SVR(kernel='rbf')
-            elif model_name == "XGBoost":
-                model = XGBRegressor(n_estimators=100, random_state=42)
-
-            model.fit(X_train, y_train)
-            forecast_scaled = model.predict(X_test)
-            forecast = scaler.inverse_transform(forecast_scaled.reshape(-1, 1)).flatten()
-            test = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
-        elif model_name in ["LSTM", "GRU", "Hybrid"]:
-            X_train_torch = torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1)
-            y_train_torch = torch.tensor(y_train, dtype=torch.float32).unsqueeze(-1)
-            X_test_torch = torch.tensor(X_test, dtype=torch.float32).unsqueeze(-1)
-
-            class TimeSeriesModel(nn.Module):
-                def __init__(self, model_type):
-                    super().__init__()
-                    if model_type == "LSTM":
-                        self.rnn = nn.LSTM(input_size=1, hidden_size=50, batch_first=True)
-                    elif model_type == "GRU":
-                        self.rnn = nn.GRU(input_size=1, hidden_size=50, batch_first=True)
-                    elif model_type == "Hybrid":
-                        self.rnn = nn.LSTM(input_size=1, hidden_size=50, batch_first=True)
-                        self.fc1 = nn.Linear(50, 25)
-                        self.fc2 = nn.Linear(25, 1)
-                    else:
-                        raise ValueError("Invalid model type")
-
-                    if model_type != "Hybrid":
-                        self.fc = nn.Linear(50, 1)
-
-                    self.model_type = model_type
-
-                def forward(self, x):
-                    out, _ = self.rnn(x)
-                    out = out[:, -1, :]
-                    if self.model_type == "Hybrid":
-                        out = torch.relu(self.fc1(out))
-                        out = self.fc2(out)
-                    else:
-                        out = self.fc(out)
-                    return out
-
-            model = TimeSeriesModel(model_name)
-            criterion = nn.MSELoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-
-            for epoch in range(50):
-                model.train()
-                optimizer.zero_grad()
-                output = model(X_train_torch)
-                loss = criterion(output, y_train_torch)
-                loss.backward()
-                optimizer.step()
-
-            model.eval()
-            with torch.no_grad():
-                forecast_scaled = model(X_test_torch).squeeze().numpy()
-
-            forecast = scaler.inverse_transform(forecast_scaled.reshape(-1, 1)).flatten()
-            test = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
-
-        return forecast, test
-
-    scaler = MinMaxScaler()
-    scaled_series = scaler.fit_transform(series.reshape(-1, 1)).flatten()
-    window = 24
-    X_train, y_train = create_features(scaled_series[:int(0.7*len(series))], window)
-    X_test, y_test = create_features(scaled_series[int(0.7*len(series))-window:], window)
-
-    forecast, test = train_model(selected_model, X_train, y_train, X_test, scaler, train, test)
-
-    rmse = np.sqrt(mean_squared_error(test, forecast))
-    mae = mean_absolute_error(test, forecast)
-    r2_raw = r2_score(test, forecast)
-    r2 = max(0.0, r2_raw)
-
-    st.sidebar.write(f"**R² Score**: {r2:.2f}")
-    st.sidebar.write(f"**RMSE**: {rmse:.2f}")
-    st.sidebar.write(f"**MAE**: {mae:.2f}")
-
-    st.subheader(f"📈 Forecast vs Actual using {selected_model}")
-    plot_df = pd.DataFrame({
-        'Datetime': dates[len(dates) - len(test):],
-        'Actual': test,
-        'Predicted': forecast
-    })
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.lineplot(data=plot_df, x='Datetime', y='Actual', label='Actual', ax=ax)
-    sns.lineplot(data=plot_df, x='Datetime', y='Predicted', label='Predicted', ax=ax)
-    ax.set_ylabel("Power Demand (MW)")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    # Visualization
+    st.subheader("Prediction vs Actuals vs Baseline")
+    baseline = np.mean(train)
+    plt.figure(figsize=(12,6))
+    plt.plot(df['DateTime'][train_size:], test, label='Actual')
+    plt.plot(df['DateTime'][train_size:], predictions, label='Predicted')
+    plt.axhline(y=baseline, color='gray', linestyle='--', label='Baseline Mean')
+    plt.xlabel("DateTime")
+    plt.ylabel("Power Demand (MW)")
+    plt.legend()
+    st.pyplot(plt)
