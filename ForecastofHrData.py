@@ -30,7 +30,10 @@ if uploaded_file is not None:
         st.error(f"❌ Required columns missing. Expected columns: {required_cols}")
         st.stop()
 
-    df['Datetime'] = pd.to_datetime(df['DateTime'])
+    
+df['Datetime'] = pd.to_datetime(df['DateTime'], errors='coerce')
+df = df.dropna(subset=['Datetime'])
+
     df = df[df['Country'] == 'India'].sort_values(by='Datetime')
 
     model_list = [
